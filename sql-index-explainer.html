@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL Index — ทำไมเขียน Query แบบนี้ถึงเร็วกว่า</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sarabun:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0f14;
+  --surface: #161923;
+  --surface2: #1e2330;
+  --border: #2a3142;
+  --border-bright: #3d4a63;
+  --text: #e8eaf0;
+  --text-muted: #7b8299;
+  --text-dim: #4a5268;
+  --red: #ff5757;
+  --red-dim: #3d1a1a;
+  --red-mid: #7a2525;
+  --green: #4ade80;
+  --green-dim: #0e2d1a;
+  --green-mid: #1a5c35;
+  --amber: #fbbf24;
+  --amber-dim: #2d2008;
+  --blue: #60a5fa;
+  --blue-dim: #0e1e3d;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Sarabun', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.7;
+  min-height: 100vh;
+}
+
+/* ── GRID BACKGROUND ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: .3;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.container {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── HERO ── */
+.hero {
+  padding: 64px 0 48px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 56px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--blue-dim);
+  border: 1px solid #1e3a6e;
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 2px;
+  letter-spacing: .08em;
+  margin-bottom: 20px;
+}
+
+.hero-badge::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: .3; }
+}
+
+h1 {
+  font-family: var(--mono);
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.15;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+h1 span { color: var(--amber); }
+
+.hero-sub {
+  color: var(--text-muted);
+  font-size: 15px;
+  max-width: 560px;
+  line-height: 1.7;
+}
+
+/* ── SECTION ── */
+.section {
+  margin-bottom: 72px;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+.section-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 2px;
+  letter-spacing: .06em;
+}
+
+.section-title {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+
+.section-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── RULE CARD ── */
+.rule-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 32px;
+}
+
+.rule-card-header {
+  padding: 14px 20px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dot { width:8px; height:8px; border-radius:50%; }
+.dot-red { background:#ff5f57; }
+.dot-amber { background:#febc2e; }
+.dot-green { background:#28c840; }
+
+/* ── CODE COMPARE ── */
+.code-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+}
+
+.code-pane {
+  background: var(--surface);
+  padding: 20px;
+}
+
+.code-pane-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  margin-bottom: 12px;
+}
+
+.label-bad  { color: var(--red); }
+.label-good { color: var(--green); }
+
+.label-bad::before  { content: '✗ '; }
+.label-good::before { content: '✓ '; }
+
+pre {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.kw  { color: #c792ea; }
+.fn  { color: var(--red); }
+.fn2 { color: var(--green); }
+.str { color: var(--amber); }
+.op  { color: var(--text-muted); }
+.col { color: #82aaff; }
+
+/* ── EXPLANATION BOX ── */
+.explain-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border-top: 1px solid var(--border);
+}
+
+.explain-pane {
+  padding: 16px 20px;
+  background: var(--surface);
+}
+
+.explain-pane.bad-pane   { background: #130d0d; }
+.explain-pane.good-pane  { background: #0a130d; }
+
+.explain-icon {
+  font-size: 22px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.explain-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  margin-bottom: 6px;
+}
+
+.explain-title.bad  { color: var(--red); }
+.explain-title.good { color: var(--green); }
+
+.explain-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── SIMULATION ── */
+.sim-wrap {
+  padding: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.sim-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border-bright);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+  letter-spacing: .02em;
+}
+.btn:hover { background: var(--surface2); color: var(--text); }
+.btn.btn-bad  { border-color: var(--red-mid); color: var(--red); background: var(--red-dim); }
+.btn.btn-good { border-color: var(--green-mid); color: var(--green); background: var(--green-dim); }
+.btn.btn-reset { font-size: 11px; color: var(--text-dim); }
+
+/* ── STATS ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stat-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 14px;
+  transition: border-color .3s;
+}
+
+.stat-box.stat-bad  { border-color: var(--red-mid); }
+.stat-box.stat-good { border-color: var(--green-mid); }
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: .06em;
+  margin-bottom: 4px;
+}
+
+.stat-val {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  transition: color .3s;
+}
+
+.stat-val.bad  { color: var(--red); }
+.stat-val.good { color: var(--green); }
+
+.stat-val.small { font-size: 14px; }
+
+/* ── STATUS LINE ── */
+.status-line {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  min-height: 18px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color .2s;
+}
+
+.status-line::before {
+  content: '>';
+  color: var(--text-dim);
+}
+
+.status-line.bad  { color: var(--red); }
+.status-line.good { color: var(--green); }
+
+/* ── DATA TABLE ── */
+.tbl-scroll { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+thead th {
+  text-align: left;
+  padding: 7px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+tbody td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #1a1f2e;
+  color: var(--text-muted);
+  transition: background .15s, color .15s, opacity .15s;
+}
+
+tbody tr.r-scan td  { background: #2a1010; color: var(--red); }
+tbody tr.r-match td { background: #0d2318; color: var(--green); font-weight: 700; }
+tbody tr.r-skip td  { opacity: .2; }
+tbody tr.r-cur td   { background: #1e2d15; color: #a8e6c3; }
+
+/* ── INDEX TREE (LIKE case) ── */
+.tree-wrap {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+}
+
+.tree-title {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: .08em;
+  margin-bottom: 12px;
+}
+
+.tree-level {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tree-level + .tree-level {
+  margin-top: 10px;
+  padding-left: 20px;
+  position: relative;
+}
+
+.tree-level + .tree-level::before {
+  content: '└─';
+  position: absolute;
+  left: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.tree-level + .tree-level + .tree-level {
+  padding-left: 40px;
+}
+
+.tree-level + .tree-level + .tree-level::before {
+  left: 20px;
+}
+
+.tn {
+  padding: 4px 10px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 11px;
+  color: var(--text-muted);
+  transition: all .3s;
+}
+
+.tn.tn-root { color: var(--text); border-color: var(--border-bright); font-weight: 700; }
+.tn.tn-hit  { background: var(--green-dim); border-color: var(--green-mid); color: var(--green); font-weight: 700; }
+.tn.tn-skip { opacity: .2; }
+.tn.tn-scan { background: var(--red-dim); border-color: var(--red-mid); color: var(--red); }
+
+/* ── VISUAL PIPELINE (horizontal row scan) ── */
+.pipeline-wrap {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.pipeline-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: .08em;
+  margin-bottom: 10px;
+}
+
+.row-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.row-cell {
+  width: 28px;
+  height: 28px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  transition: all .2s;
+}
+
+.row-cell.c-scan  { background: #2a1010; border-color: var(--red-mid); color: var(--red); }
+.row-cell.c-match { background: #0d2318; border-color: var(--green-mid); color: var(--green); }
+.row-cell.c-skip  { opacity: .15; }
+.row-cell.c-cur   { border-color: var(--amber); background: var(--amber-dim); color: var(--amber); transform: scale(1.15); z-index: 1; }
+
+/* ── FOOTER ── */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 0 0;
+  margin-top: 24px;
+}
+
+.footer-rule {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: start;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.footer-rule-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  padding-top: 2px;
+}
+
+.footer-rule-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.footer-rule-text strong { color: var(--amber); font-weight: 500; }
+
+/* ── PROGRESS BAR ── */
+.progress-bar {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  width: 0%;
+  transition: width .3s, background .3s;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .code-compare, .explain-row { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge">SQL PERFORMANCE — INDEX GUIDE</div>
+    <h1>เขียน Query แบบไหน<br>ให้ระบบ<span> ใช้ Index</span> ได้</h1>
+    <p class="hero-sub">Index เปรียบเหมือนสารบัญในหนังสือ — ถ้าเขียน Query ถูกวิธี ระบบกระโดดไปยังข้อมูลได้ทันที แต่ถ้าผิด ต้องพลิกทุกหน้าตั้งแต่ต้น</p>
+  </div>
+
+  <!-- ══════════════════════════════
+       CASE 1: YEAR() vs range
+  ══════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">RULE 01</span>
+      <span class="section-title">อย่าครอบคอลัมน์ด้วยฟังก์ชัน</span>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="rule-card">
+      <div class="rule-card-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-amber"></div>
+        <div class="dot dot-green"></div>
+        <span style="margin-left:8px;">orders.sql</span>
+      </div>
+
+      <div class="code-compare">
+        <div class="code-pane">
+          <div class="code-pane-label label-bad">ช้า — Index ช่วยไม่ได้</div>
+          <pre><span class="kw">WHERE</span> <span class="fn">YEAR</span>(<span class="col">create_date</span>) <span class="op">=</span> <span class="str">2026</span></pre>
+        </div>
+        <div class="code-pane">
+          <div class="code-pane-label label-good">เร็ว — ใช้ Index ได้เต็มที่</div>
+          <pre><span class="kw">WHERE</span> <span class="col">create_date</span> <span class="op">&gt;=</span> <span class="str">'2026-01-01'</span>
+  <span class="kw">AND</span> <span class="col">create_date</span> <span class="op">&lt;</span>  <span class="str">'2027-01-01'</span></pre>
+        </div>
+      </div>
+
+      <div class="explain-row">
+        <div class="explain-pane bad-pane">
+          <span class="explain-icon">🔴</span>
+          <div class="explain-title bad">ปัญหา — Function Wrap</div>
+          <div class="explain-text">
+            ฟังก์ชัน <code style="color:var(--red);">YEAR()</code> ถูกเรียกใช้กับ <strong style="color:var(--text);">ทุกแถว</strong> ก่อนจะเปรียบค่า ระบบมองไม่เห็น Index จึงต้องสแกนตารางทั้งหมดตั้งแต่ต้น
+          </div>
+        </div>
+        <div class="explain-pane good-pane">
+          <span class="explain-icon">🟢</span>
+          <div class="explain-title good">วิธีแก้ — Range Comparison</div>
+          <div class="explain-text">
+            เปรียบค่าตรงกับคอลัมน์โดยไม่มีฟังก์ชันครอบ ระบบใช้ B-Tree Index <strong style="color:var(--text);">กระโดด</strong>ไปยังช่วงวันที่ที่ต้องการได้ทันที
+          </div>
+        </div>
+      </div>
+
+      <!-- SIMULATION -->
+      <div class="sim-wrap">
+        <div class="sim-controls">
+          <button class="btn" id="d-btn-bad"  onclick="runDate('bad')">▶ รัน YEAR() ดูผล</button>
+          <button class="btn" id="d-btn-good" onclick="runDate('good')">▶ รัน range ดูผล</button>
+          <button class="btn btn-reset" onclick="resetDate()">↺ รีเซ็ต</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-box" id="d-stat1">
+            <div class="stat-label">ROWS SCANNED</div>
+            <div class="stat-val" id="d-checked">—</div>
+          </div>
+          <div class="stat-box" id="d-stat2">
+            <div class="stat-label">ROWS MATCHED</div>
+            <div class="stat-val" id="d-found">—</div>
+          </div>
+          <div class="stat-box" id="d-stat3">
+            <div class="stat-label">METHOD</div>
+            <div class="stat-val small" id="d-method">—</div>
+          </div>
+        </div>
+
+        <div class="progress-bar"><div class="progress-fill" id="d-progress"></div></div>
+        <div class="status-line" id="d-status">กดปุ่มด้านบนเพื่อจำลองการทำงาน</div>
+
+        <!-- ROW GRID VISUAL -->
+        <div class="pipeline-wrap">
+          <div class="pipeline-label">ROWS IN TABLE (แต่ละช่องแทน 1 แถว, สีแดง = กำลังตรวจ, สีเขียว = ตรง, จาง = ข้ามไป)</div>
+          <div class="row-grid" id="d-grid"></div>
+        </div>
+
+        <!-- DATA TABLE -->
+        <div class="tbl-scroll">
+          <table id="d-table">
+            <thead><tr>
+              <th>ROW</th>
+              <th>ORDER_ID</th>
+              <th>CREATE_DATE</th>
+              <th>CUSTOMER</th>
+              <th>AMOUNT</th>
+              <th>STATUS</th>
+            </tr></thead>
+            <tbody id="d-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       CASE 2: LIKE
+  ══════════════════════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">RULE 02</span>
+      <span class="section-title">ระวัง % ข้างหน้าใน LIKE</span>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="rule-card">
+      <div class="rule-card-header">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-amber"></div>
+        <div class="dot dot-green"></div>
+        <span style="margin-left:8px;">employees.sql</span>
+      </div>
+
+      <div class="code-compare">
+        <div class="code-pane">
+          <div class="code-pane-label label-bad">ช้า — Full Table Scan</div>
+          <pre><span class="kw">WHERE</span> <span class="col">name</span> <span class="kw">LIKE</span> <span class="fn">'%สมชาย'</span></pre>
+        </div>
+        <div class="code-pane">
+          <div class="code-pane-label label-good">เร็ว — Index Prefix Seek</div>
+          <pre><span class="kw">WHERE</span> <span class="col">name</span> <span class="kw">LIKE</span> <span class="fn2">'สมชาย%'</span></pre>
+        </div>
+      </div>
+
+      <div class="explain-row">
+        <div class="explain-pane bad-pane">
+          <span class="explain-icon">🔴</span>
+          <div class="explain-title bad">ปัญหา — Wildcard ข้างหน้า</div>
+          <div class="explain-text">
+            <code style="color:var(--red);">%สมชาย</code> แปลว่า "ลงท้ายด้วยสมชาย" ระบบไม่รู้ว่าจะเริ่มหาที่ไหน เหมือนหาคนที่ "นามสกุลขึ้นต้น" โดยไม่รู้นามสกุล — ต้องพลิกสมุดโทรศัพท์ทั้งเล่ม
+          </div>
+        </div>
+        <div class="explain-pane good-pane">
+          <span class="explain-icon">🟢</span>
+          <div class="explain-title good">วิธีแก้ — Prefix ข้างหน้า</div>
+          <div class="explain-text">
+            <code style="color:var(--green);">สมชาย%</code> Index รู้ prefix — กระโดดไปหมวด "ส" แล้วอ่านแค่ entries ที่ขึ้นต้นด้วย "สมชาย" หยุดเมื่อเจอตัวอักษรอื่น
+          </div>
+        </div>
+      </div>
+
+      <div class="sim-wrap">
+        <!-- INDEX TREE -->
+        <div class="tree-wrap">
+          <div class="tree-title">B-TREE INDEX — คอลัมน์ name (เรียงตามตัวอักษร)</div>
+          <div class="tree-level">
+            <div class="tn tn-root" id="tn-root">Root</div>
+          </div>
+          <div class="tree-level">
+            <div class="tn" id="tn-1">ก–ข</div>
+            <div class="tn" id="tn-2">ช–ญ</div>
+            <div class="tn" id="tn-3">ท–น</div>
+            <div class="tn" id="tn-4" style="font-weight:700;">ป–ส</div>
+            <div class="tn" id="tn-5">ห–ฮ</div>
+          </div>
+          <div class="tree-level">
+            <div class="tn" id="tn-l1">ประวิทย์</div>
+            <div class="tn" id="tn-l2">พิชัย</div>
+            <div class="tn" id="tn-l3">มานพ</div>
+            <div class="tn" id="tn-l4">สมชาย ก.</div>
+            <div class="tn" id="tn-l5">สมชาย ข.</div>
+            <div class="tn" id="tn-l6">สุชาติ</div>
+          </div>
+        </div>
+
+        <div class="sim-controls">
+          <button class="btn" id="l-btn-bad"  onclick="runLike('bad')">▶ รัน LIKE '%สมชาย'</button>
+          <button class="btn" id="l-btn-good" onclick="runLike('good')">▶ รัน LIKE 'สมชาย%'</button>
+          <button class="btn btn-reset" onclick="resetLike()">↺ รีเซ็ต</button>
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-box" id="l-stat1">
+            <div class="stat-label">ROWS SCANNED</div>
+            <div class="stat-val" id="l-checked">—</div>
+          </div>
+          <div class="stat-box" id="l-stat2">
+            <div class="stat-label">ROWS MATCHED</div>
+            <div class="stat-val" id="l-found">—</div>
+          </div>
+          <div class="stat-box" id="l-stat3">
+            <div class="stat-label">METHOD</div>
+            <div class="stat-val small" id="l-method">—</div>
+          </div>
+        </div>
+
+        <div class="progress-bar"><div class="progress-fill" id="l-progress"></div></div>
+        <div class="status-line" id="l-status">กดปุ่มด้านบนเพื่อจำลองการทำงาน</div>
+
+        <div class="pipeline-wrap">
+          <div class="pipeline-label">ROWS IN TABLE</div>
+          <div class="row-grid" id="l-grid"></div>
+        </div>
+
+        <div class="tbl-scroll">
+          <table>
+            <thead><tr>
+              <th>ROW</th>
+              <th>NAME</th>
+              <th>DEPT</th>
+              <th>POSITION</th>
+              <th>SALARY</th>
+            </tr></thead>
+            <tbody id="l-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER RULES SUMMARY -->
+  <div class="footer">
+    <div style="font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:.08em; margin-bottom:14px;">SUMMARY — กฎที่ต้องจำ</div>
+
+    <div class="footer-rule">
+      <div class="footer-rule-num">01</div>
+      <div class="footer-rule-text">
+        <strong>อย่าครอบคอลัมน์ด้วยฟังก์ชัน</strong> — เขียน <code style="color:var(--text);">WHERE create_date >= '2026-01-01'</code> แทน <code style="color:var(--red);">WHERE YEAR(create_date) = 2026</code> เพราะฟังก์ชันทำให้ระบบมองไม่เห็น Index
+      </div>
+    </div>
+
+    <div class="footer-rule">
+      <div class="footer-rule-num">02</div>
+      <div class="footer-rule-text">
+        <strong>ใส่ % ไว้หลัง prefix เสมอ</strong> — <code style="color:var(--text);">LIKE 'สมชาย%'</code> ใช้ Index ได้ แต่ <code style="color:var(--red);">LIKE '%สมชาย'</code> ต้องสแกนทั้งตาราง เพราะ Index เรียงจากซ้ายไปขวาเหมือนสมุดโทรศัพท์
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DATE_DATA = [
+  { id:'ORD-001', date:'2025-03-12', cust:'กมลา พ.',  amt:'฿1,200', status:'PAID'    },
+  { id:'ORD-002', date:'2025-06-04', cust:'ชัยวัฒน์', amt:'฿4,500', status:'PAID'    },
+  { id:'ORD-003', date:'2025-09-17', cust:'ทักษิณ ว.', amt:'฿890',   status:'REFUND'  },
+  { id:'ORD-004', date:'2025-11-28', cust:'นภา อ.',   amt:'฿3,100', status:'PAID'    },
+  { id:'ORD-005', date:'2026-01-15', cust:'ประวิทย์', amt:'฿7,200', status:'PAID'    },
+  { id:'ORD-006', date:'2026-03-08', cust:'สมชาย ก.', amt:'฿2,400', status:'PENDING' },
+  { id:'ORD-007', date:'2026-05-22', cust:'สมชาย ข.', amt:'฿5,600', status:'PAID'    },
+  { id:'ORD-008', date:'2026-08-30', cust:'สุชาติ ท.', amt:'฿1,900', status:'PAID'    },
+  { id:'ORD-009', date:'2026-11-03', cust:'อนงค์ ศ.', amt:'฿8,300', status:'PAID'    },
+  { id:'ORD-010', date:'2026-12-18', cust:'อำนาจ แ.', amt:'฿4,100', status:'PAID'    },
+  { id:'ORD-011', date:'2027-01-05', cust:'กมลา พ.',  amt:'฿2,700', status:'PAID'    },
+  { id:'ORD-012', date:'2027-03-14', cust:'ชัยวัฒน์', amt:'฿9,100', status:'PENDING' },
+];
+
+const LIKE_DATA = [
+  { name:'กมลา พรหมมา',     dept:'HR',      pos:'ผู้จัดการ',  sal:'฿58,000' },
+  { name:'ชัยวัฒน์ สุขใจ',  dept:'IT',      pos:'นักพัฒนา',  sal:'฿72,000' },
+  { name:'ทักษิณ วงค์ดี',   dept:'Sales',   pos:'พนักงาน',   sal:'฿45,000' },
+  { name:'นภา อินทร์งาม',   dept:'Finance', pos:'นักบัญชี',  sal:'฿55,000' },
+  { name:'ประวิทย์ ดีมาก',  dept:'HR',      pos:'พนักงาน',   sal:'฿41,000' },
+  { name:'สมชาย กาญจนา',   dept:'IT',      pos:'นักพัฒนา',  sal:'฿68,000' },
+  { name:'สมชาย ขาวสะอาด', dept:'Sales',   pos:'ผู้จัดการ',  sal:'฿75,000' },
+  { name:'สุชาติ ทองคำ',   dept:'IT',      pos:'สถาปนิก',   sal:'฿90,000' },
+  { name:'อนงค์ ศรีทอง',   dept:'Finance', pos:'นักบัญชี',  sal:'฿52,000' },
+  { name:'อำนาจ แดงแจ่ม',  dept:'Sales',   pos:'พนักงาน',   sal:'฿38,000' },
+];
+
+const D_MATCH = [4,5,6,7,8,9];
+const L_MATCH = [5,6];
+const GRID_TOTAL = 40;
+
+let dTimer = null, lTimer = null;
+
+function buildDateTable() {
+  const tb = document.getElementById('d-tbody');
+  tb.innerHTML = '';
+  DATE_DATA.forEach((r,i) => {
+    const tr = document.createElement('tr');
+    tr.id = 'dr'+i;
+    tr.innerHTML = `<td>${i+1}</td><td>${r.id}</td><td>${r.date}</td><td>${r.cust}</td><td>${r.amt}</td><td>${r.status}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildLikeTable() {
+  const tb = document.getElementById('l-tbody');
+  tb.innerHTML = '';
+  LIKE_DATA.forEach((r,i) => {
+    const tr = document.createElement('tr');
+    tr.id = 'lr'+i;
+    tr.innerHTML = `<td>${i+1}</td><td>${r.name}</td><td>${r.dept}</td><td>${r.pos}</td><td>${r.sal}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+function buildGrid(id, total) {
+  const g = document.getElementById(id);
+  g.innerHTML = '';
+  for(let i=0;i<total;i++){
+    const d = document.createElement('div');
+    d.className='row-cell'; d.id=id+'c'+i; d.textContent=i+1;
+    g.appendChild(d);
+  }
+}
+
+function resetDate() {
+  if(dTimer) clearInterval(dTimer);
+  buildDateTable(); buildGrid('d-grid', GRID_TOTAL);
+  ['d-checked','d-found','d-method'].forEach(id=>{ const e=document.getElementById(id); e.textContent='—'; e.className='stat-val'; });
+  ['d-stat1','d-stat2','d-stat3'].forEach(id=>{ document.getElementById(id).className='stat-box'; });
+  const p=document.getElementById('d-progress'); p.style.width='0%'; p.style.background='';
+  const s=document.getElementById('d-status'); s.textContent='กดปุ่มด้านบนเพื่อจำลองการทำงาน'; s.className='status-line';
+  document.getElementById('d-btn-bad').className='btn';
+  document.getElementById('d-btn-good').className='btn';
+}
+
+function resetLike() {
+  if(lTimer) clearInterval(lTimer);
+  buildLikeTable(); buildGrid('l-grid', GRID_TOTAL);
+  ['l-checked','l-found','l-method'].forEach(id=>{ const e=document.getElementById(id); e.textContent='—'; e.className='stat-val'; });
+  ['l-stat1','l-stat2','l-stat3'].forEach(id=>{ document.getElementById(id).className='stat-box'; });
+  const p=document.getElementById('l-progress'); p.style.width='0%'; p.style.background='';
+  const s=document.getElementById('l-status'); s.textContent='กดปุ่มด้านบนเพื่อจำลองการทำงาน'; s.className='status-line';
+  document.getElementById('l-btn-bad').className='btn';
+  document.getElementById('l-btn-good').className='btn';
+  ['tn-root','tn-1','tn-2','tn-3','tn-4','tn-5','tn-l1','tn-l2','tn-l3','tn-l4','tn-l5','tn-l6'].forEach(id=>{
+    const e=document.getElementById(id);
+    e.className='tn';
+    if(id==='tn-root') e.className='tn tn-root';
+    if(id==='tn-4') e.style.fontWeight='700';
+  });
+}
+
+function runDate(mode) {
+  resetDate();
+  const checkedEl=document.getElementById('d-checked');
+  const foundEl=document.getElementById('d-found');
+  const methodEl=document.getElementById('d-method');
+  const statusEl=document.getElementById('d-status');
+  const prog=document.getElementById('d-progress');
+
+  if(mode==='bad') {
+    document.getElementById('d-btn-bad').className='btn btn-bad';
+    methodEl.textContent='Full Scan'; methodEl.className='stat-val bad';
+    checkedEl.className='stat-val bad';
+    ['d-stat1','d-stat2','d-stat3'].forEach(id=>document.getElementById(id).className='stat-box stat-bad');
+    prog.style.background='var(--red)';
+    statusEl.textContent='กำลังคำนวณ YEAR() ทุกแถว...'; statusEl.className='status-line bad';
+    let i=0, found=0;
+    dTimer=setInterval(()=>{
+      if(i>0){
+        const prev=document.getElementById('dr'+(i-1));
+        if(prev && !D_MATCH.includes(i-1)) prev.className='';
+        const gc=document.getElementById('d-gridc'+(i-1));
+        if(gc && !D_MATCH.includes(i-1)) gc.className='row-cell c-scan';
+      }
+      if(i>=DATE_DATA.length){
+        clearInterval(dTimer);
+        for(let j=0;j<GRID_TOTAL;j++){
+          const gc=document.getElementById('d-gridc'+j);
+          if(gc) gc.className=D_MATCH.includes(j%DATE_DATA.length)?'row-cell c-match':'row-cell c-scan';
+        }
+        statusEl.textContent='ตรวจครบ '+DATE_DATA.length+' แถว — พบ '+D_MATCH.length+' แถว (ต้องอ่านทั้งหมดทุกครั้ง!)';
+        prog.style.width='100%';
+        checkedEl.textContent=DATE_DATA.length;
+        foundEl.textContent=D_MATCH.length;
+        return;
+      }
+      const row=document.getElementById('dr'+i);
+      const isMatch=D_MATCH.includes(i);
+      if(isMatch){row.className='r-match';found++;foundEl.textContent=found;}
+      else row.className='r-scan';
+      const gc=document.getElementById('d-gridc'+i);
+      if(gc) gc.className=isMatch?'row-cell c-match':'row-cell c-cur';
+      checkedEl.textContent=i+1;
+      prog.style.width=Math.round((i+1)/DATE_DATA.length*100)+'%';
+      row.scrollIntoView({block:'nearest',behavior:'smooth'});
+      i++;
+    }, 180);
+  } else {
+    document.getElementById('d-btn-good').className='btn btn-good';
+    methodEl.textContent='Index Range Seek'; methodEl.className='stat-val good';
+    checkedEl.className='stat-val good';
+    ['d-stat1','d-stat2','d-stat3'].forEach(id=>document.getElementById(id).className='stat-box stat-good');
+    prog.style.background='var(--green)';
+    statusEl.textContent='Index กระโดดข้ามแถว 0–3 และ 10–11 ทันที...'; statusEl.className='status-line good';
+    for(let j=0;j<4;j++){
+      document.getElementById('dr'+j).className='r-skip';
+      const gc=document.getElementById('d-gridc'+j); if(gc) gc.className='row-cell c-skip';
+    }
+    for(let j=10;j<12;j++){
+      document.getElementById('dr'+j).className='r-skip';
+      const gc=document.getElementById('d-gridc'+j); if(gc) gc.className='row-cell c-skip';
+    }
+    for(let j=12;j<GRID_TOTAL;j++){
+      const gc=document.getElementById('d-gridc'+j); if(gc) gc.className='row-cell c-skip';
+    }
+    prog.style.width='25%';
+    let i=4, found=0;
+    setTimeout(()=>{
+      statusEl.textContent='กำลังอ่านเฉพาะช่วงวันที่ 2026...';
+      dTimer=setInterval(()=>{
+        if(i>4){
+          const prev=document.getElementById('dr'+(i-1));
+          if(prev && D_MATCH.includes(i-1)) { /* keep */ }
+        }
+        if(i>=10){
+          clearInterval(dTimer);
+          for(let j=4;j<10;j++){
+            const gc=document.getElementById('d-gridc'+j);
+            if(gc) gc.className=D_MATCH.includes(j)?'row-cell c-match':'row-cell c-scan';
+          }
+          statusEl.textContent='ตรวจเพียง 6 แถว (จาก 12) — พบ '+D_MATCH.length+' แถว! ประหยัดการอ่านไป 50%';
+          checkedEl.textContent=6; foundEl.textContent=D_MATCH.length;
+          prog.style.width='100%';
+          return;
+        }
+        const row=document.getElementById('dr'+i);
+        const isMatch=D_MATCH.includes(i);
+        row.className=isMatch?'r-match':'r-cur';
+        if(isMatch){found++;foundEl.textContent=found;}
+        const gc=document.getElementById('d-gridc'+i);
+        if(gc) gc.className=isMatch?'row-cell c-match':'row-cell c-cur';
+        checkedEl.textContent=i-3;
+        prog.style.width=Math.round(25+(i-4)/6*75)+'%';
+        row.scrollIntoView({block:'nearest',behavior:'smooth'});
+        i++;
+      }, 300);
+    }, 600);
+  }
+}
+
+function runLike(mode) {
+  resetLike();
+  const checkedEl=document.getElementById('l-checked');
+  const foundEl=document.getElementById('l-found');
+  const methodEl=document.getElementById('l-method');
+  const statusEl=document.getElementById('l-status');
+  const prog=document.getElementById('l-progress');
+
+  if(mode==='bad') {
+    document.getElementById('l-btn-bad').className='btn btn-bad';
+    methodEl.textContent='Full Scan'; methodEl.className='stat-val bad';
+    checkedEl.className='stat-val bad';
+    ['l-stat1','l-stat2','l-stat3'].forEach(id=>document.getElementById(id).className='stat-box stat-bad');
+    prog.style.background='var(--red)';
+    statusEl.textContent='% ข้างหน้า — ต้องสแกนทุกแถวตั้งแต่ต้น...'; statusEl.className='status-line bad';
+    let i=0, found=0;
+    lTimer=setInterval(()=>{
+      if(i>0){
+        const prev=document.getElementById('lr'+(i-1));
+        if(prev&&!L_MATCH.includes(i-1)) prev.className='';
+        const gc=document.getElementById('l-gridc'+(i-1));
+        if(gc&&!L_MATCH.includes(i-1)) gc.className='row-cell c-scan';
+      }
+      if(i>=LIKE_DATA.length){
+        clearInterval(lTimer);
+        for(let j=0;j<GRID_TOTAL;j++){
+          const gc=document.getElementById('l-gridc'+j);
+          if(gc) gc.className=L_MATCH.includes(j%LIKE_DATA.length)?'row-cell c-match':'row-cell c-scan';
+        }
+        statusEl.textContent='ตรวจครบ '+LIKE_DATA.length+' แถว — พบ '+L_MATCH.length+' แถว (อ่านทั้งหมด!)';
+        prog.style.width='100%';
+        checkedEl.textContent=LIKE_DATA.length; foundEl.textContent=L_MATCH.length;
+        return;
+      }
+      const row=document.getElementById('lr'+i);
+      const isMatch=L_MATCH.includes(i);
+      if(isMatch){row.className='r-match';found++;foundEl.textContent=found;}
+      else row.className='r-scan';
+      const gc=document.getElementById('l-gridc'+i);
+      if(gc) gc.className=isMatch?'row-cell c-match':'row-cell c-cur';
+      checkedEl.textContent=i+1;
+      prog.style.width=Math.round((i+1)/LIKE_DATA.length*100)+'%';
+      i++;
+    }, 200);
+  } else {
+    document.getElementById('l-btn-good').className='btn btn-good';
+    methodEl.textContent='Index Prefix Seek'; methodEl.className='stat-val good';
+    checkedEl.className='stat-val good';
+    ['l-stat1','l-stat2','l-stat3'].forEach(id=>document.getElementById(id).className='stat-box stat-good');
+    prog.style.background='var(--green)';
+
+    const steps=[
+      {d:0, fn:()=>{
+        statusEl.textContent='Index เข้า Root...'; statusEl.className='status-line good';
+        document.getElementById('tn-root').className='tn tn-root tn-hit';
+        prog.style.width='15%';
+      }},
+      {d:500, fn:()=>{
+        statusEl.textContent='"สมชาย" → prefix ส — ข้ามหมวด ก–ข, ช–ญ, ท–น, ห–ฮ';
+        ['tn-1','tn-2','tn-3','tn-5'].forEach(id=>document.getElementById(id).className='tn tn-skip');
+        document.getElementById('tn-4').className='tn tn-hit';
+        prog.style.width='35%';
+      }},
+      {d:1100, fn:()=>{
+        statusEl.textContent='เข้า leaf nodes ในหมวด ป–ส — ข้าม ประวิทย์, พิชัย, มานพ, สุชาติ';
+        ['tn-l1','tn-l2','tn-l3','tn-l6'].forEach(id=>document.getElementById(id).className='tn tn-skip');
+        prog.style.width='55%';
+      }},
+      {d:1700, fn:()=>{
+        statusEl.textContent='พบ "สมชาย ก." และ "สมชาย ข." — หยุดที่ "สุชาติ" เพราะเกินช่วง prefix แล้ว';
+        document.getElementById('tn-l4').className='tn tn-hit';
+        document.getElementById('tn-l5').className='tn tn-hit';
+        prog.style.width='80%';
+        for(let j=0;j<5;j++){
+          document.getElementById('lr'+j).className='r-skip';
+          const gc=document.getElementById('l-gridc'+j); if(gc) gc.className='row-cell c-skip';
+        }
+        for(let j=7;j<LIKE_DATA.length;j++){
+          document.getElementById('lr'+j).className='r-skip';
+          const gc=document.getElementById('l-gridc'+j); if(gc) gc.className='row-cell c-skip';
+        }
+        for(let j=LIKE_DATA.length;j<GRID_TOTAL;j++){
+          const gc=document.getElementById('l-gridc'+j); if(gc) gc.className='row-cell c-skip';
+        }
+      }},
+      {d:2200, fn:()=>{
+        document.getElementById('lr5').className='r-match';
+        document.getElementById('lr6').className='r-match';
+        const g5=document.getElementById('l-gridc5'); if(g5) g5.className='row-cell c-match';
+        const g6=document.getElementById('l-gridc6'); if(g6) g6.className='row-cell c-match';
+        checkedEl.textContent=3; foundEl.textContent=2;
+        prog.style.width='100%';
+        statusEl.textContent='ตรวจเพียง 3 แถว (จาก 10) — พบ 2 แถว! ประหยัดการอ่านไป 70%';
+      }},
+    ];
+    steps.forEach(s=>setTimeout(s.fn, s.d));
+  }
+}
+
+buildDateTable();
+buildLikeTable();
+buildGrid('d-grid', GRID_TOTAL);
+buildGrid('l-grid', GRID_TOTAL);
+</script>
+</body>
+</html>
